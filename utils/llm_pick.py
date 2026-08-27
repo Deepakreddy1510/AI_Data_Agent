@@ -28,5 +28,9 @@ def pick_llm(level : str):
     return llm 
 
 
-llm_obj = pick_llm("low")
-print(llm_obj.invoke("What is the capital of France?"))
+# This if loop runs only when we run this file and if we import this file in any other file
+# then this if loop will not run. This is a good practice to test the functionality of the code
+#  in the file.
+if __name__ == "__main__":
+    llm_obj = pick_llm("low")
+    print(llm_obj.invoke("What is the capital of France?"))

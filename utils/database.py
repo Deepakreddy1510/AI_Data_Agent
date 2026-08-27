@@ -2,7 +2,7 @@ import psycopg2
 from psycopg2 import sql
 
 
-class DataBaseUtil:
+class DatabaseUtil:
 
     def __init__(self, db_config):
         self.db_config = db_config
@@ -13,15 +13,16 @@ class DataBaseUtil:
             self.connection = None
 
     def schema_details(self, schema_name):
-        cursor = None
+        schema_info_context = ""
+        connection = self.connection
+        cursor = connection.cursor() 
         schema_info_context = f"DataBase Schema Name: {schema_name}\n"
 
         if self.connection is None:
             return "Error: No active database connection."
 
         try:
-            cursor = self.connection.cursor()
-
+             
             # Get all tables in the schema
             cursor.execute(
                 "SELECT table_name FROM information_schema.tables WHERE table_schema = %s;",
@@ -69,8 +70,33 @@ class DataBaseUtil:
 
         return schema_info_context
 
+    def execute_query(self, query):
+        cursor = None
+        result = None
 
-obj = DataBaseUtil({
+        if self.connection is None:
+            return "Error: No active database connection."
+
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(query)
+            result = cursor.fetchall()  # Fetch all results by converting the result into a list
+            self.connection.commit()  # Commit the transaction if needed
+
+        except Exception as e:
+            print(f"Error occurred while executing query: {e}")
+            result = f"Error occurred while executing query: {e}"
+
+        finally:
+            if cursor:
+                cursor.close()
+            if self.connection:
+                self.connection.close()
+
+        return str(result)  # Convert the result to string before returning
+
+
+obj = DatabaseUtil({
     "host": "localhost",
     "port": 5432,
     "user": "postgres",
