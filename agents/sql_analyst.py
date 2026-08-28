@@ -1,14 +1,68 @@
-import os 
+import json
+import os
+import re
 import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from dotenv import load_dotenv
 from utils.database import DatabaseUtil
-from utils.llm_pick import pick_llm 
+from utils.llm_pick import pick_llm
 from Models.schema import AgentSchema, JudgeSchema
 from langchain.messages import AIMessage, HumanMessage
 from langgraph.graph import StateGraph, START, END
 
+load_dotenv()
+
+
+def _db_config() -> dict:
+    """Match utils/feed_db.py: .env uses `database`, not `dbname`."""
+    if "port" not in os.environ:
+        os.environ["port"] = "5432"
+    return {
+        "host": os.environ["host"],
+        "port": int(os.environ["port"]),
+        "user": os.environ["user"],
+        "password": os.environ["password"],
+        "database": os.environ["database"],
+    }
+
+
+def _extract_sql(raw_sql: str) -> str:
+    """LLMs often wrap SQL in markdown fences; strip those before execution."""
+    text = (raw_sql or "").strip()
+    fenced = re.search(r"```(?:sql)?\s*(.*?)\s*```", text, re.DOTALL | re.IGNORECASE)
+    if fenced:
+        return fenced.group(1).strip()
+    return text
+
+
+def _parse_judge_text(raw: str) -> dict:
+    """Parse Yes/No + comments from JSON or markdown (gpt-oss often ignores tools)."""
+    text = (raw or "").strip()
+    json_blob = re.search(r"\{.*\}", text, re.DOTALL)
+    if json_blob:
+        try:
+            data = json.loads(json_blob.group())
+            answer = str(data.get("answer", "")).strip()
+            if answer.lower() in ("yes", "no"):
+                return {
+                    "answer": "Yes" if answer.lower() == "yes" else "No",
+                    "comments": str(data.get("comments", "")).strip(),
+                }
+        except json.JSONDecodeError:
+            pass
+
+    match = re.search(r"Answer[:\*]*\s*(Yes|No)", text, re.IGNORECASE)
+    if match:
+        comments_match = re.search(r"Comments[:\*]*\s*(.*)", text, re.IGNORECASE | re.DOTALL)
+        comments = comments_match.group(1).strip() if comments_match else text
+        return {
+            "answer": "Yes" if match.group(1).lower() == "yes" else "No",
+            "comments": comments,
+        }
+
+    raise ValueError(f"Could not parse SQL-safety judge output: {text[:500]}")
 
 # --------------------------------------- AI Agent Code----------------------------------------
 
@@ -29,15 +83,7 @@ def prompt_query_context(state: AgentSchema) -> str:
 
     curated_question = state.curated_ques
 
-    conn_details = {
-        "host": os.environ['host'],
-        "port": int(os.environ['port']),
-        "user": os.environ['user'],
-        "password": os.environ['password'],
-        "dbname": os.environ['dbname']  
-    }
-
-    obj = DatabaseUtil(conn_details)
+    obj = DatabaseUtil(_db_config())
 
     schema_info = obj.schema_details("public")  # Fetch schema details for the 'public' schema
 
@@ -70,10 +116,10 @@ def generate_sql(state: AgentSchema) -> AgentSchema:
     prompt = state.prompt_query_context
 
     # this prompt will go to the llm and i will create a medium level llm
-    llm = pick_llm("medium")   
-    generated_sql_query = llm.invoke(prompt).content # Generate the SQL query using the LLM
+    llm = pick_llm("medium")
+    generated_sql_query = llm.invoke(prompt).content  # Generate the SQL query using the LLM
 
-    state.generated_sql_query = generated_sql_query # Update the state with the generated SQL query
+    state.generated_sql_query = _extract_sql(generated_sql_query)
 
     return state
 
@@ -84,26 +130,29 @@ def is_safe_sql(state: AgentSchema) -> str:
 
     sql_query = state.generated_sql_query
 
-    llm = pick_llm("medium")  # Pick the appropriate LLM based on the level of the question
-    llm_judge = llm.with_structured_output(JudgeSchema)  # Create a structured output LLM for judging the safety of the SQL query
+    llm = pick_llm("medium")
 
+    # gpt-oss on Groq often ignores tool/schema calling; ask for JSON and parse it.
     prompt = f"""
-    You are an SQL Judge for data security. Your task is to determine whether the SQL query generated 
-    by the agent is safe or not. The SQL query should only be used for data retrieval and should 
-    not modify the database in any way. Neither the SQL query nor the prompt should contain any SQL 
+    You are an SQL Judge for data security. Your task is to determine whether the SQL query generated
+    by the agent is safe or not. The SQL query should only be used for data retrieval and should
+    not modify the database in any way. Neither the SQL query nor the prompt should contain any SQL
     commands that can modify the database, such as INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE or any
-    other commands that can change the structure or content of the database. If the SQL query is safe,
-    respond with 'Yes' otherwise respond with 'No'. Additionally, provide comments explaining your 
-    decision. 
-    Here's the SQL query to evaluate: 
+    other commands that can change the structure or content of the database.
+
+    Return ONLY a JSON object with exactly these keys:
+    - "answer": "Yes" if the query is read-only/safe, otherwise "No"
+    - "comments": a short explanation of your decision
+
+    SQL query to evaluate:
     {sql_query}
     """
 
-    # Invoke the structured output LLM to evaluate the safety of the SQL query
-    response = llm_judge.invoke(prompt).model_dump() 
+    raw = llm.invoke(prompt).content
+    response = JudgeSchema.model_validate(_parse_judge_text(raw)).model_dump()
 
-    state.is_safe_sql_response = response['answer'] # Update the state with the safety evaluation result
-    state.comments = response['comments'] # Update the state with the comments from the judge
+    state.is_safe_sql_response = response['answer']
+    state.comments = response['comments']
 
     return state
 
@@ -121,19 +170,12 @@ def canceled_sql(state: AgentSchema) -> AgentSchema:
 # Execute SQL Query Node
 def execute_sql(state: AgentSchema) -> AgentSchema:
 
-    sql_query = state.generated_sql_query
+    sql_query = _extract_sql(state.generated_sql_query)
+    state.generated_sql_query = sql_query
 
-    conn_details = {
-        "host": os.environ['host'],
-        "port": int(os.environ['port']),
-        "user": os.environ['user'],
-        "password": os.environ['password'],
-        "dbname": os.environ['dbname']  
-    }
+    obj = DatabaseUtil(_db_config())
 
-    obj = DatabaseUtil(conn_details)
-
-    execution_result = obj.execute_sql(sql_query)  # Execute the SQL query on the database
+    execution_result = obj.execute_query(sql_query)  # Execute the SQL query on the database
 
     state.sql_query_execution_result = execution_result # Update the state with the execution result
     state.final_answer = f"The SQL query was executed successfully. The results are: {execution_result}"
@@ -201,14 +243,11 @@ def is_safe_sql_edge(state: AgentSchema) -> str:
     else:
         return "canceled_sql"   
 
-sql_agent_graph.add_conditional_edges("is_safe_sql", is_safe_sql_edge)
-# The above conditional edge will check the output of the is_safe_sql node and based on that it will decide which edge to take next.
-# It will automatically create the roots from that particular node to the next node based on the output of the conditional edge function.
-
-# If we want to add more edges from the is_safe_sql node, we can do that by adding more edges
-# to the graph. But we have to make sure that the conditional edge function is updated accordingly.
-sql_agent_graph.add_edge("is_safe_sql", "execute_sql")
-sql_agent_graph.add_edge("is_safe_sql", "canceled_sql")
+sql_agent_graph.add_conditional_edges(
+    "is_safe_sql",
+    is_safe_sql_edge,
+    {"execute_sql": "execute_sql", "canceled_sql": "canceled_sql"},
+)
 
 sql_agent_graph.add_edge("canceled_sql", END)
 sql_agent_graph.add_edge("execute_sql", "represent_final_answer")
@@ -241,13 +280,31 @@ if __name__ == "__main__":
         "prompt_query_context": "",
         "generated_sql_query": "",
         "comments": "",
-        "is_safe_sql_response": "",
+        "is_safe_sql_response": "No",
         "sql_query_execution_result": "",
         "final_answer": ""
     } 
 
-    # Invoke the graph with the input schema
+    # Execute the graph 
     sql_analyst_response = sql_analyst.invoke(input_schema)
+    print(sql_analyst_response['messages']) # Print the final output of the graph execution
+    print("******************************")
+
+    print(sql_analyst_response['generated_sql_query']) # Print the generated SQL query
+
+    print("******************************")
+
+    print(sql_analyst_response['sql_query_execution_result']) # Print the result of executing the SQL query
+
+    print("******************************")
+
+    print(sql_analyst_response['prompt_query_context']) # Print the prompt query context
+
+
+    # sql_analyst_response = sql_analyst.invoke(input_schema)
+    # print(sql_analyst_response.get("final_answer", sql_analyst_response))
+
+
 
 
 

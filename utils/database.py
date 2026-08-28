@@ -14,15 +14,15 @@ class DatabaseUtil:
 
     def schema_details(self, schema_name):
         schema_info_context = ""
-        connection = self.connection
-        cursor = connection.cursor() 
+        cursor = None
         schema_info_context = f"DataBase Schema Name: {schema_name}\n"
 
         if self.connection is None:
             return "Error: No active database connection."
 
         try:
-             
+            cursor = self.connection.cursor()
+
             # Get all tables in the schema
             cursor.execute(
                 "SELECT table_name FROM information_schema.tables WHERE table_schema = %s;",
@@ -85,6 +85,7 @@ class DatabaseUtil:
 
         except Exception as e:
             print(f"Error occurred while executing query: {e}")
+            self.connection.rollback()
             result = f"Error occurred while executing query: {e}"
 
         finally:
@@ -94,17 +95,3 @@ class DatabaseUtil:
                 self.connection.close()
 
         return str(result)  # Convert the result to string before returning
-
-
-obj = DatabaseUtil({
-    "host": "localhost",
-    "port": 5432,
-    "user": "postgres",
-    "password": "deepak@2005",
-    "dbname": "postgres"
-})
-
-result = obj.schema_details("public")
-
-with open("test_schema_details.txt", "w") as f:
-    f.write(result)
