@@ -1,3 +1,5 @@
+# A simple script to test the Judge LLM for evaluating the safety of SQL queries.
+
 import os 
 import sys
 

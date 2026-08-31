@@ -255,11 +255,13 @@ sql_agent_graph.add_edge("represent_final_answer", END)
 
 
 
+# Compile the graph
+sql_analyst = sql_agent_graph.compile()
+
 # We want to run it only when we run this file directly, not when we import it as a module.
 # So, we will use the below condition.
 if __name__ == "__main__":
     # Compile the Graph
-    sql_analyst = sql_agent_graph.compile()
 
     # Display the graph in Jupyter Notebook
     # optional 

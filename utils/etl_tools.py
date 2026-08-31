@@ -50,7 +50,7 @@ class ETLTools:
         except requests.exceptions.RequestException as e:
             return f"Failed to extract data: {e}"
     
-    def transform_load_context(self, file_path:str, output_folder:str, output_format:str):
+    def transform_load_context(self, file_path:str):
         """
         This tool transforms the data from the specified file and loads it into the desired location (output_folder).
 
@@ -77,11 +77,32 @@ class ETLTools:
         top_3_rows = str(df.head(3))
 
         return top_3_rows
+    
+    def execute_code(self, code:str):
+        """
+        This tool executes the provided code and returns the output. 
+
+        Args:
+            code (str): The code to be executed. 
+        Returns:
+            str: The output of the executed code or an error message if execution fails. 
+        """
+
+        try:
+            exec(code)
+            return "Code executed successfully"
+        except Exception as e:
+            return f"Failed to execute code: {e}"
 
 
 if __name__ == "__main__":
     # This is the main function that will be used to extract the data from the API and save it to the CSV file
     obj = ETLTools()
-    print(obj.extract_load("https://pokeapi.co/api/v2/pokemon/", "data/extract", "csv"))
+    # print(obj.extract_load("https://pokeapi.co/api/v2/pokemon/", "data/extract", "csv"))
+    path = "C:\\Users\\DELL\\Downloads\\DATA_AGENT\\data\\extract\\extracted_data.csv"
+    print(obj.transform_load_context(path))
+
+
+
 
 
