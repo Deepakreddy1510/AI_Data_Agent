@@ -33,9 +33,7 @@ def router_node(state:DataAgentSchema):
 
     route_response = route_response_dict['answer']
 
-    state.route_response = route_response # Add the route response to the state
-
-    return state
+    return {"route_response": route_response}
 
 # Now we need 2 more nodes, one is for SQL and other is for ETL. 
 # The SQL node will be responsible for generating the SQL query and the ETL node will be responsible for generating the ETL code.
@@ -49,9 +47,9 @@ def etl_node(state:DataAgentSchema):
             {message}
         """)]}
     )
-    state.messages = state.messages + [response]
-
-    return state
+    return {
+        "messages": [response["messages"][-1]]
+    }
 
 
 def sql_node(state:DataAgentSchema):
@@ -65,7 +63,7 @@ def sql_node(state:DataAgentSchema):
         "prompt_query_context": "",
         "generated_sql_query": "",
         "comments": "",
-        "is_safe_sql_response": "No",
+        "is_safe": "No",
         "sql_query_execution_result": "",
         "final_answer": ""
     } 

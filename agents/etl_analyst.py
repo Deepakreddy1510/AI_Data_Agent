@@ -103,9 +103,9 @@ def llm_node(state:ETLAgentSchema):
 
     final_answer = llm_bind.invoke(prompt)
 
-    state.messages = messages + [final_answer]
-
-    return state
+    return {
+        "messages": [final_answer]
+    }
 
 
 def tool_node(state:ETLAgentSchema):
@@ -129,9 +129,9 @@ def tool_node(state:ETLAgentSchema):
 
         tools_results.append(ToolMessage(content=observation, tool_call_id = tool_call['id']))
 
-    state.messages = state.messages + tools_results
-
-    return state
+    return {
+        "messages": tools_results
+    }
 
 
 # Nodes & edges
