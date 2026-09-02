@@ -70,9 +70,9 @@ def sql_node(state:DataAgentSchema):
 
     response = sql_analyst.invoke(input_schema)
 
-    state.messages = state.messages + [response]
-
-    return state
+    return {
+        "messages": [response["messages"][-1]]
+    }
 
 # Now i will simply try to create the graph
 data_agent_graph = StateGraph(DataAgentSchema)

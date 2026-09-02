@@ -74,9 +74,10 @@ def curate_question(state: AgentSchema) -> str:
 
     response = llm.invoke(f"Curate the following question: {user_question}").content
 
-    state.curated_ques = response # Update the state with the curated question
-    state.messages = state.messages + [HumanMessage(content=f"{response}")] # Append the curated question to the messages list
-    return state
+    return {
+        "curated_ques": response,
+        "messages": [HumanMessage(content=response)]
+    }
 
 
 def prompt_query_context(state: AgentSchema) -> str:
@@ -106,10 +107,9 @@ def prompt_query_context(state: AgentSchema) -> str:
     
     """    
 
-    state.prompt_query_context = prompt
-
-    return state
-
+    return {
+        "prompt_query_context": prompt
+    }
 
 # Generate SQL Query Node
 def generate_sql(state: AgentSchema) -> AgentSchema:
@@ -119,9 +119,9 @@ def generate_sql(state: AgentSchema) -> AgentSchema:
     llm = pick_llm("medium")
     generated_sql_query = llm.invoke(prompt).content  # Generate the SQL query using the LLM
 
-    state.generated_sql_query = _extract_sql(generated_sql_query)
-
-    return state
+    return {
+        "generated_sql_query": _extract_sql(generated_sql_query)
+    }
 
 
 
@@ -151,20 +151,22 @@ def is_safe_sql(state: AgentSchema) -> str:
     raw = llm.invoke(prompt).content
     response = JudgeSchema.model_validate(_parse_judge_text(raw)).model_dump()
 
-    state.is_safe_sql_response = response['answer']
-    state.comments = response['comments']
-
-    return state
+    return {
+        "is_safe": response["answer"],
+        "comments": response["comments"]
+    }
 
 # Canceled SQL Query Node
-def canceled_sql(state: AgentSchema) -> AgentSchema:
+def canceled_sql(state: AgentSchema) -> dict:
 
     comments = state.comments
 
-    state.final_answer = f"The SQL query was deemed unsafe to execute. The reason provided by the judge is: {comments}. Therefore, the SQL query will not be executed, and no results will be returned."
-    state.messages = state.messages + [AIMessage(content=f"{state.final_answer}")] # Append the final answer to the messages list
+    final_answer = f"The SQL query was deemed unsafe to execute. The reason provided by the judge is: {comments}. Therefore, the SQL query will not be executed, and no results will be returned."
 
-    return state
+    return {
+        "final_answer": final_answer,
+        "messages": [AIMessage(content=final_answer)]
+    }
 
 
 # Execute SQL Query Node
@@ -177,13 +179,17 @@ def execute_sql(state: AgentSchema) -> AgentSchema:
 
     execution_result = obj.execute_query(sql_query)  # Execute the SQL query on the database
 
-    state.sql_query_execution_result = execution_result # Update the state with the execution result
-    state.final_answer = f"The SQL query was executed successfully. The results are: {execution_result}"
-
-    return state
+    return {
+        "generated_sql_query": sql_query,
+        "sql_query_execution_result": execution_result,
+        "final_answer": (
+            "The SQL query was executed successfully. "
+            f"The results are: {execution_result}"
+        )
+    }
 
 # Represent the final answer Node 
-def represent_final_answer(state: AgentSchema) -> str:
+def represent_final_answer(state: AgentSchema) -> dict:
     executed_result = state.sql_query_execution_result
     curated_question = state.curated_ques 
 
@@ -202,10 +208,10 @@ def represent_final_answer(state: AgentSchema) -> str:
 
     llm_response = llm.invoke(prompt).content # Generate the final answer from the LLM
 
-    state.final_answer = llm_response # Update the state with the final answer
-    state.messages = state.messages + [AIMessage(content=f"{llm_response}")] # Append the final answer to the messages list
-
-    return state
+    return {
+        "final_answer": llm_response,
+        "messages": [AIMessage(content=f"{llm_response}")]
+    }
 
 
 # -------------------------------------------Graph Building-------------------------------------------
@@ -236,7 +242,7 @@ sql_agent_graph.add_edge("generate_sql", "is_safe_sql")
 
 # Conditional Edge Function
 def is_safe_sql_edge(state: AgentSchema) -> str:
-    is_safe = state.is_safe_sql_response
+    is_safe = state.is_safe
 
     if is_safe.lower() == "yes":
         return "execute_sql"
@@ -282,7 +288,7 @@ if __name__ == "__main__":
         "prompt_query_context": "",
         "generated_sql_query": "",
         "comments": "",
-        "is_safe_sql_response": "No",
+        "is_safe": "No",
         "sql_query_execution_result": "",
         "final_answer": ""
     } 
