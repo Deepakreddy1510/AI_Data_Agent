@@ -597,66 +597,34 @@ The message state is used to maintain the agent conversation while the router de
 
 ## Security Considerations
 
-The SQL workflow contains an LLM-based validation step designed to detect potentially destructive SQL queries before execution.
+The SQL agent only allows read-only queries. Requests such as `DELETE`, `UPDATE`, `DROP`, and other database-changing operations are blocked before execution.
 
-The ETL workflow can also generate and execute Python/Pandas code dynamically.
+The ETL agent can generate and execute Pandas code for transformations. Since this code is generated dynamically, this part needs more protection before the project is used in a production environment.
 
-Because generated code is executed programmatically, this project should currently be treated as an educational and development project rather than a production-ready system.
+Some security improvements that can be added later are:
 
-For production use, additional protections should be added, such as:
-
-* Read-only database credentials
-* Deterministic SQL validation
-* SQL parsing using an AST
-* Query timeouts
-* Sandboxed Python execution
-* File-system restrictions
-* Resource limits
-* API allowlists
-* Logging and monitoring
+- Run generated ETL code in a restricted environment
+- Add query timeouts
+- Limit which files the ETL agent can access
+- Protect database credentials and API keys
+- Add logs for SQL execution, safety checks, ETL operations, and errors
 
 ## Future Improvements
 
-The next improvements will focus on making the project more reliable, secure, and useful as a complete data-agent system.
+I plan to improve the project step by step as I continue working on it.
 
-* Add a production-ready deployment setup for the Streamlit frontend and FastAPI backend
-* Expose ETL-generated files through secure download links instead of server-side file paths
-* Store generated ETL outputs in persistent object storage for deployed environments
-* Replace unrestricted generated-Python execution with a safer sandboxed transformation environment
-* Strengthen SQL validation with parser/AST-based checks in addition to deterministic guards
-* Add authentication, session management, and safer handling of database connection credentials
-* Improve conversational memory for longer multi-turn analytical questions
-* Add richer retry, timeout, and failure-recovery handling for database and ETL operations
-* Add structured logging, tracing, and monitoring for agent decisions and tool calls
-* Expand support for additional file formats and data sources such as Excel and cloud storage
-* Improve warehouse-aware reasoning across raw, staging, dimension, and fact tables
-* Add more automated integration and end-to-end tests across SQL, routing, safety, and ETL workflows
-* Add Docker-based local and deployment environments
-* Support additional LLM providers through a configurable model layer
-* Explore additional specialized agents only where they provide a clear data-engineering use case
-
-## Learning Goals
-
-This project is being developed as a hands-on way to understand and implement an AI-powered data agent end to end.
-
-The main learning goals are:
-
-* Understand every component of the original project before extending or replacing it
-* Learn how LangGraph state, nodes, conditional edges, and subgraphs work in a multi-agent system
-* Understand how a Data Agent routes requests between SQL and ETL workflows
-* Build natural-language-to-SQL workflows using real PostgreSQL schema metadata
-* Learn how database schema discovery, primary keys, foreign keys, and table relationships can ground LLM reasoning
-* Implement deterministic and LLM-assisted safeguards for read-only SQL execution
-* Handle ambiguous metrics and prevent the agent from inventing unsupported business definitions
-* Support conversational follow-up questions while preserving the user's analytical intent
-* Understand how ETL tools perform API extraction, Pandas transformations, and file generation
-* Learn how agent instructions can be propagated from the main Data Agent to specialized child agents
-* Build and understand a FastAPI layer that exposes agent functionality through REST endpoints
-* Build a simple Streamlit interface for database connection, agent instructions, chat, SQL visibility, safety status, and results
-* Learn how to test agent behavior using normal, edge-case, safety, failure, and multi-turn scenarios
-* Understand the security limitations of LLM-generated SQL and Python code and how those limitations should be improved for production
-* Learn how to move an AI/data prototype from a local project toward a deployable, maintainable application
-* Be able to explain, modify, debug, and defend every major design decision in the project without depending on generated code blindly
+- Deploy the Streamlit frontend and FastAPI backend
+- Add file download support for ETL outputs
+- Improve SQL safety checks
+- Add better error handling and retries
+- Improve support for follow-up questions
+- Add more tests for SQL and ETL flows
+- Support more file types such as Excel and Parquet
+- Improve support for raw, staging, fact, and dimension tables
+- Add logging and monitoring
+- Improve security for database connections and generated code
+- Add Docker support
+- Support more LLM providers in the future
 
 ## Author
 
