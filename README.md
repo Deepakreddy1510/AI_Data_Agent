@@ -617,39 +617,46 @@ For production use, additional protections should be added, such as:
 
 ## Future Improvements
 
-Possible improvements include:
+The next improvements will focus on making the project more reliable, secure, and useful as a complete data-agent system.
 
-* Conversational CLI
-* Web-based user interface
-* Persistent conversation memory
-* Additional data sources
-* More ETL tools
-* Excel file support
-* Improved SQL validation
-* Sandboxed generated-code execution
-* Automated tests
-* Retry and error handling
-* LangSmith or other tracing support
-* Docker support
-* Additional LLM providers
-* Additional specialized agents
+* Add a production-ready deployment setup for the Streamlit frontend and FastAPI backend
+* Expose ETL-generated files through secure download links instead of server-side file paths
+* Store generated ETL outputs in persistent object storage for deployed environments
+* Replace unrestricted generated-Python execution with a safer sandboxed transformation environment
+* Strengthen SQL validation with parser/AST-based checks in addition to deterministic guards
+* Add authentication, session management, and safer handling of database connection credentials
+* Improve conversational memory for longer multi-turn analytical questions
+* Add richer retry, timeout, and failure-recovery handling for database and ETL operations
+* Add structured logging, tracing, and monitoring for agent decisions and tool calls
+* Expand support for additional file formats and data sources such as Excel and cloud storage
+* Improve warehouse-aware reasoning across raw, staging, dimension, and fact tables
+* Add more automated integration and end-to-end tests across SQL, routing, safety, and ETL workflows
+* Add Docker-based local and deployment environments
+* Support additional LLM providers through a configurable model layer
+* Explore additional specialized agents only where they provide a clear data-engineering use case
 
 ## Learning Goals
 
-This project was developed to learn and practice:
+This project is being developed as a hands-on way to understand and implement an AI-powered data agent end to end.
 
-* Agentic AI
-* LangGraph
-* LangChain
-* Multi-agent systems
-* LLM routing
-* Tool calling
-* Structured outputs
-* SQL agents
-* ETL agents
-* PostgreSQL integration
-* Pandas transformations
-* LangGraph state management
+The main learning goals are:
+
+* Understand every component of the original project before extending or replacing it
+* Learn how LangGraph state, nodes, conditional edges, and subgraphs work in a multi-agent system
+* Understand how a Data Agent routes requests between SQL and ETL workflows
+* Build natural-language-to-SQL workflows using real PostgreSQL schema metadata
+* Learn how database schema discovery, primary keys, foreign keys, and table relationships can ground LLM reasoning
+* Implement deterministic and LLM-assisted safeguards for read-only SQL execution
+* Handle ambiguous metrics and prevent the agent from inventing unsupported business definitions
+* Support conversational follow-up questions while preserving the user's analytical intent
+* Understand how ETL tools perform API extraction, Pandas transformations, and file generation
+* Learn how agent instructions can be propagated from the main Data Agent to specialized child agents
+* Build and understand a FastAPI layer that exposes agent functionality through REST endpoints
+* Build a simple Streamlit interface for database connection, agent instructions, chat, SQL visibility, safety status, and results
+* Learn how to test agent behavior using normal, edge-case, safety, failure, and multi-turn scenarios
+* Understand the security limitations of LLM-generated SQL and Python code and how those limitations should be improved for production
+* Learn how to move an AI/data prototype from a local project toward a deployable, maintainable application
+* Be able to explain, modify, debug, and defend every major design decision in the project without depending on generated code blindly
 
 ## Author
 
